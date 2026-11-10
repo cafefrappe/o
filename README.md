@@ -1,59 +1,59 @@
 # 甲骨文 VPS → PushDeer 每日状态通知
 
-在 Oracle Cloud（甲骨文）VPS 上采集主机状态，每天通过 [PushDeer](https://www.pushdeer.com/) 推送到手机。
+海外甲骨文 VPS **直连不了** PushDeer（`api2.pushdeer.com`），本方案不依赖 Mac 在线：
 
-## 推送内容
+1. **VPS** 每天采集状态  
+2. 调用 GitHub API 触发 Actions  
+3. **GitHub Actions** 代推 PushDeer  
 
-- 主机名、时间、公网 IP
-- 运行时长、负载、CPU 核心数
-- 内存与根分区用量
-- 磁盘紧张 / 负载偏高时标题带告警标记
+## 一次性配置
 
-## 快速开始
+### A. GitHub 仓库 Secrets
 
-1. 把本仓库放到 VPS（或本机克隆后 scp）：
+打开：https://github.com/cafefrappe/o/settings/secrets/actions  
+
+新增：
+
+| Name | Value |
+|------|-------|
+| `PUSHDEER_KEY` | 你的 PushDeer 密钥 |
+
+### B. 创建 GitHub PAT（给 VPS 用）
+
+1. https://github.com/settings/tokens  
+2. 生成 classic token，勾选 `repo`（或 fine-grained：对该仓库允许触发 workflow / 读写）  
+3. 只保存在 VPS 的 `.env`，不要提交仓库  
+
+### C. VPS 部署
 
 ```bash
 git clone https://github.com/cafefrappe/o.git ~/oracle-vps-pushdeer
 cd ~/oracle-vps-pushdeer
 cp .env.example .env
-# 编辑 .env，填入 PUSHDEER_KEY
+nano .env   # 填入 GH_DISPATCH_TOKEN=...
+chmod +x *.sh
+./vps_dispatch.sh    # 试跑：应触发 Actions，手机收到通知
+./install-cron.sh    # 默认每天 09:00（配合 crontab 里 TZ=Asia/Shanghai）
 ```
 
-2. 试跑一次：
+## 推送内容
 
-```bash
-chmod +x check_and_notify.sh install-cron.sh
-./check_and_notify.sh
-```
+- 主机名、时间、公网 IP  
+- 运行时长、负载、CPU  
+- 内存、根分区  
+- 磁盘/负载异常时标题告警  
 
-3. 安装每日 09:00 cron：
+## 脚本
 
-```bash
-./install-cron.sh
-```
-
-自定义时间（例如每天 21:30）：
-
-```bash
-CRON_HOUR=21 CRON_MINUTE=30 ./install-cron.sh
-```
-
-## 环境变量
-
-| 变量 | 说明 |
+| 脚本 | 作用 |
 |------|------|
-| `PUSHDEER_KEY` | PushDeer 推送密钥（必填） |
-| `NOTIFY_TITLE` | 通知标题前缀，默认「甲骨文 VPS 状态」 |
-| `PUSHDEER_API` | API 地址，默认 `https://api2.pushdeer.com/message/push` |
+| `collect_status.sh` | 只采集状态 |
+| `vps_dispatch.sh` | VPS：采集并触发 GitHub Actions |
+| `install-cron.sh` | 安装 VPS 每日 cron |
+| `mac_relay_notify.sh` | 可选：Mac 在线时代推（非必需） |
 
-密钥只放在 `.env` 中，不要提交到 Git。
+## 说明
 
-## 依赖
-
-- `bash`、`curl`
-- `python3` 或 `jq`（URL 编码）
-
-## 日志
-
-cron 输出写入同目录 `notify.log`。
+- Mac **不需要**全天在线  
+- 公开仓库中不含 PushDeer 密钥与 PAT  
+- Actions 工作流：`.github/workflows/pushdeer-notify.yml`  

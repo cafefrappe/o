@@ -1,0 +1,48 @@
+name: PushDeer VPS Status
+
+on:
+  repository_dispatch:
+    types: [vps_status]
+  workflow_dispatch:
+    inputs:
+      title:
+        description: Notification title
+        required: true
+        type: string
+      desp:
+        description: Notification body (markdown)
+        required: true
+        type: string
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send PushDeer notification
+        env:
+          PUSHDEER_KEY: ${{ secrets.PUSHDEER_KEY }}
+          TITLE: ${{ github.event.client_payload.title || inputs.title }}
+          DESP: ${{ github.event.client_payload.desp || inputs.desp }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PUSHDEER_KEY}" ]; then
+            echo "Missing secret PUSHDEER_KEY"
+            exit 1
+          fi
+          if [ -z "${TITLE}" ]; then
+            echo "Missing title"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import os, urllib.parse, urllib.request
+          key = os.environ["PUSHDEER_KEY"]
+          title = os.environ["TITLE"]
+          desp = os.environ.get("DESP", "")
+          qs = urllib.parse.urlencode({"pushkey": key, "text": title, "desp": desp})
+          url = "https://api2.pushdeer.com/message/push?" + qs
+          with urllib.request.urlopen(url, timeout=30) as resp:
+              body = resp.read().decode()
+              print(body)
+              if '"success":"ok"' not in body and '"code":0' not in body.replace(" ", ""):
+                  raise SystemExit("PushDeer response not ok")
+          PY
