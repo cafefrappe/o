@@ -38,7 +38,7 @@ fi
 cpu_cores="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo "?")"
 
 public_ip="获取失败"
-if command -v curl >/dev/null 2>/dev/null 2>&1; then
+if command -v curl >/dev/null 2>&1; then
   public_ip="$(curl -fsS --max-time 8 https://ifconfig.me/ip 2>/dev/null \
     || curl -fsS --max-time 8 https://api.ipify.org 2>/dev/null \
     || echo "获取失败")"
